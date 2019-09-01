@@ -29,7 +29,7 @@ namespace Kahla.Server.Controllers
         private readonly KahlaPushService _pusher;
 
         public ConversationController(
-            UserManager<KahlaUser> userManager,
+            UserManager<KahlaUser> userManager, 
             KahlaDbContext dbContext,
             KahlaPushService pushService)
         {
@@ -46,7 +46,7 @@ namespace Kahla.Server.Controllers
                 .MyConversations(user.Id)
                 .ToListAsync();
             var contacts = conversations.Select(conversation => new ContactInfo
-            {
+                {
                 ConversationId = conversation.Id,
                 DisplayName = conversation.GetDisplayName(user.Id),
                 DisplayImagePath = conversation.GetDisplayImagePath(user.Id),
@@ -59,9 +59,9 @@ namespace Kahla.Server.Controllers
                 Muted = (conversation as GroupConversation)?.Users?.FirstOrDefault(t => t.UserId == user.Id)?.Muted ?? false,
                 SomeoneAtMe = conversation.WasAted(user.Id)
             })
-            .OrderByDescending(t => t.SomeoneAtMe)
-            .ThenByDescending(t => t.LatestMessageTime)
-            .ToList();
+                .OrderByDescending(t => t.SomeoneAtMe)
+                .ThenByDescending(t => t.LatestMessageTime)
+                .ToList();
             return Json(new AiurCollection<ContactInfo>(contacts)
             {
                 Code = ErrorType.Success,
@@ -70,7 +70,7 @@ namespace Kahla.Server.Controllers
         }
 
         [APIProduces(typeof(AiurCollection<Message>))]
-        public async Task<IActionResult> GetMessage([Required]int id, int skipTill = -1, int take = 15)
+        public async Task<IActionResult> GetMessage([Required] int id, int skipTill = -1, int take = 15)
         {
             var user = await GetKahlaUser();
             var target = await _dbContext
@@ -112,7 +112,6 @@ namespace Kahla.Server.Controllers
         [HttpPost]
         public async Task<IActionResult> SendMessage(SendMessageAddressModel model)
         {
-            model.At = model.At ?? new string[0];
             var user = await GetKahlaUser();
             var target = await _dbContext
                 .Conversations
@@ -142,9 +141,9 @@ namespace Kahla.Server.Controllers
             _dbContext.Messages.Add(message);
             await _dbContext.SaveChangesAsync();
             // Create at info for this message.
-            foreach (var atTargetId in model.At)
+            if (target is GroupConversation targetGroup)
             {
-                if (target.Joined(atTargetId))
+                void AddAt(string atTargetId)
                 {
                     var at = new At
                     {
@@ -154,31 +153,53 @@ namespace Kahla.Server.Controllers
                     message.Ats.Add(at);
                     _dbContext.Ats.Add(at);
                 }
+
+                model.At = model.At ?? new string[0];
+                if (model.At.Length == 1 && model.At[0] == "all" && targetGroup.OwnerId == user.Id)
+                {
+                    await targetGroup.ForEachUserAsync((eachUser, relation) =>
+                    {
+                        AddAt(eachUser.Id);
+                        return Task.CompletedTask;
+                    }, _userManager);
+                }
                 else
                 {
-                    _dbContext.Messages.Remove(message);
-                    await _dbContext.SaveChangesAsync();
-                    return this.Protocol(ErrorType.InvalidInput, $"Can not at person with Id: '{atTargetId}' because he is not in this conversation.");
+                    foreach (var atTargetId in model.At)
+                    {
+                        if (targetGroup.Joined(atTargetId))
+                        {
+                            AddAt(atTargetId);
+                        }
+                        else
+                        {
+                            _dbContext.Messages.Remove(message);
+                            await _dbContext.SaveChangesAsync();
+                            return this.Protocol(ErrorType.InvalidInput,
+                                $"Can not at person with Id: '{atTargetId}' because he is not in this conversation.");
+                        }
+                    }
                 }
             }
+
             await _dbContext.SaveChangesAsync();
             await target.ForEachUserAsync((eachUser, relation) =>
             {
-                var mentioned = model.At.Contains(eachUser.Id);
+                var mentioned = message.Ats.Exists(t => t.TargetUserId == eachUser.Id);
                 return _pusher.NewMessageEvent(
-                                receiver: eachUser,
-                                conversation: target,
-                                message: message,
-                                muted: !mentioned && (relation?.Muted ?? false),
-                                mentioned: mentioned
-                                );
+                    receiver: eachUser,
+                    conversation: target,
+                    message: message,
+                    muted: !mentioned && (relation?.Muted ?? false),
+                    mentioned: mentioned
+                    );
             }, _userManager);
             return this.Protocol(ErrorType.Success, "Your message has been sent.");
         }
 
         [APIProduces(typeof(AiurValue<PrivateConversation>))]
         [APIProduces(typeof(AiurValue<GroupConversation>))]
-        public async Task<IActionResult> ConversationDetail([Required]int id)
+        public async Task<IActionResult> ConversationDetail([Required] int id)
         {
             var user = await GetKahlaUser();
             var target = await _dbContext

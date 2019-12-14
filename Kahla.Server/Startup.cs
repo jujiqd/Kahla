@@ -1,4 +1,5 @@
 ﻿using Aiursoft.Pylon;
+using Aiursoft.Pylon.Middlewares;
 using Kahla.SDK.Models;
 using Kahla.Server.Data;
 using Kahla.Server.Middlewares;
@@ -57,7 +58,19 @@ namespace Kahla.Server
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
             app.UseMiddleware<HandleKahlaOptionsMiddleware>();
-            app.UseAiurAPIHandler(env.IsDevelopment());
+
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+                app.UseDatabaseErrorPage();
+            }
+            else
+            {
+                app.UseMiddleware<HandleRobotsMiddleware>();
+                app.UseMiddleware<UserFriendlyServerExceptionMiddeware>();
+                app.UseMiddleware<UserFriendlyNotFoundMiddeware>();
+            }
+
             app.UseAiursoftDefault();
         }
     }

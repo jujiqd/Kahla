@@ -1,0 +1,57 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kahla-deployment
+  namespace: aiursoft-kahla-staging
+  labels:
+    name: kahla
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: kahla
+  template:
+    metadata:
+      labels:
+        name: kahla
+    spec:
+      containers:
+      - name: kahla-pod
+        image: aiursoftweb/kahla-server-api:staging
+        ports:
+        - containerPort: 80
+        imagePullPolicy: Always
+
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: kahla-service
+  namespace: aiursoft-kahla-staging
+spec:
+  type: NodePort
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    name: kahla
+---
+  
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: kahla-ingress
+  namespace: aiursoft-kahla-staging
+spec:
+  rules:
+  - host: server.kahla.app
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: kahla-service
+          servicePort: 80
+
+---

@@ -1,4 +1,5 @@
 ﻿using Aiursoft.Pylon;
+using AutoMapper;
 using Kahla.SDK.Models;
 using Kahla.Server.Data;
 using Kahla.Server.Middlewares;
@@ -26,6 +27,7 @@ namespace Kahla.Server
 
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddAutoMapper(typeof(Startup));
             services.AddDbContext<KahlaDbContext>(options =>
                 options.UseSqlServer(_configuration.GetConnectionString("DatabaseConnection")));
 

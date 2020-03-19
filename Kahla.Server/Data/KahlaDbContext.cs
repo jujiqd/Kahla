@@ -1,4 +1,6 @@
-﻿using Kahla.SDK.Models;
+﻿using AutoMapper;
+using AutoMapper.QueryableExtensions;
+using Kahla.SDK.Models;
 using Kahla.SDK.Models.ApiViewModels;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +14,7 @@ namespace Kahla.Server.Data
     public class KahlaDbContext : IdentityDbContext<KahlaUser>
     {
         private readonly IConfiguration _configuration;
+
         public KahlaDbContext(
             DbContextOptions<KahlaDbContext> options,
             IConfiguration configuration) : base(options)
@@ -31,42 +34,12 @@ namespace Kahla.Server.Data
 
         public IQueryable<ContactInfo> MyContacts(string userId)
         {
+            var config = new MapperConfiguration(t => t.AddProfile<PrivateConversationProfile>());
             return Conversations
                 .AsNoTracking()
                 .Where(t => !(t is PrivateConversation) || ((PrivateConversation)t).RequesterId == userId || ((PrivateConversation)t).TargetId == userId)
                 .Where(t => !(t is GroupConversation) || ((GroupConversation)t).Users.Any(p => p.UserId == userId))
-                .Select(t => new ContactInfo
-                {
-                    ConversationId = t.Id,
-                    Discriminator = t.Discriminator,
-
-                    DisplayName = (t is PrivateConversation) ?
-                        (userId == ((PrivateConversation)t).RequesterId ? ((PrivateConversation)t).TargetUser.NickName : ((PrivateConversation)t).RequestUser.NickName) :
-                        ((GroupConversation)t).GroupName,
-                    DisplayImagePath = (t is PrivateConversation) ?
-                        (userId == ((PrivateConversation)t).RequesterId ? ((PrivateConversation)t).TargetUser.IconFilePath : ((PrivateConversation)t).RequestUser.IconFilePath) :
-                        ((GroupConversation)t).GroupImagePath,
-                    UserId = (t is PrivateConversation) ?
-                        (userId == ((PrivateConversation)t).RequesterId ? ((PrivateConversation)t).TargetId : ((PrivateConversation)t).RequesterId) :
-                        ((GroupConversation)t).OwnerId,
-                    UnReadAmount =
-                        (t is GroupConversation) ?
-                        t.Messages.Count(m => m.SendTime > ((GroupConversation)t).Users.SingleOrDefault(u => u.UserId == userId).ReadTimeStamp) :
-                        t.Messages.Count(p => !p.Read && p.SenderId != userId),
-
-                    LatestMessage = t.Messages.OrderByDescending(p => p.SendTime).FirstOrDefault(),
-                    Sender = t.Messages.Any() ? t.Messages.OrderByDescending(p => p.SendTime).Select(t => t.Sender).FirstOrDefault() : null,
-
-                    Muted = (t is GroupConversation) ?
-                        ((GroupConversation)t).Users.SingleOrDefault(u => u.UserId == userId).Muted : false,
-                    AesKey = t.AESKey,
-                    SomeoneAtMe = (t is GroupConversation) ? t.Messages
-                        .Where(m => m.SendTime > ((GroupConversation)t).Users.SingleOrDefault(u => u.UserId == userId).ReadTimeStamp)
-                        .Any(p => p.Ats.Any(k => k.TargetUserId == userId)) : false,
-                    EnableInvisiable = (t is PrivateConversation) ?
-                        (userId == ((PrivateConversation)t).RequesterId ? ((PrivateConversation)t).TargetUser.EnableInvisiable : ((PrivateConversation)t).RequestUser.EnableInvisiable) :
-                        false,
-                })
+                .ProjectTo<ContactInfo>(config, new { userId })
                 .OrderByDescending(t => t.SomeoneAtMe)
                 .ThenByDescending(t => t.LatestMessage == null ? DateTime.MinValue : t.LatestMessage.SendTime);
         }

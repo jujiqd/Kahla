@@ -1,6 +1,7 @@
 ﻿using Aiursoft.Pylon;
 using AutoMapper;
 using Kahla.SDK.Models;
+using Kahla.SDK.Models.ApiViewModels;
 using Kahla.Server.Data;
 using Kahla.Server.Middlewares;
 using Microsoft.AspNetCore.Builder;
@@ -27,7 +28,8 @@ namespace Kahla.Server
 
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddAutoMapper(typeof(Startup));
+            var mappingConfig = new MapperConfiguration(mc => mc.AddProfile<ContactInfoProfile>());
+            services.AddSingleton(mappingConfig.CreateMapper());
             services.AddDbContext<KahlaDbContext>(options =>
                 options.UseSqlServer(_configuration.GetConnectionString("DatabaseConnection")));
 

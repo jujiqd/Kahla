@@ -13,7 +13,7 @@ using Websocket.Client;
 
 namespace Kahla.SDK.Data
 {
-    public class EventSyncer : ISingletonDependency
+    public class EventSyncer : IScopedDependency
     {
         private readonly ConversationService _conversationService;
         private readonly FriendshipService _friendshipService;

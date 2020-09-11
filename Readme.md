@@ -1,6 +1,7 @@
 # Aiursoft Kahla Backend
 
 #### This branch is use .net 5 preview version.
+#### Don't use in production
 
 [![Build status](https://aiursoft.visualstudio.com/Star/_apis/build/status/Kahla%20Server%20Build)](https://aiursoft.visualstudio.com/Star/_build/latest?definitionId=6)
 [![NuGet version (Kahla.SDK)](https://img.shields.io/nuget/v/Kahla.SDK.svg?style=flat-square)](https://www.nuget.org/packages/Kahla.SDK/)
